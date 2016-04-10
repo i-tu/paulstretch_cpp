@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include "Thread.h"
 #include "globals.h"
+#include <stdio.h>
 
 #ifdef WINDOWS
 DWORD WINAPI thread_function( LPVOID arg ) {
@@ -42,7 +43,9 @@ Thread::~Thread(){
 };
 
 bool Thread::start(){
+
     if (running) return false;
+    printf("thread started");
 #ifdef WINDOWS
     hThread=CreateThread(NULL,0,thread_function,this,0,NULL);
 #else

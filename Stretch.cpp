@@ -20,9 +20,12 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include <iostream>
+
 unsigned int FFT::start_rand_seed=1;
 
 FFT::FFT(int nsamples_){
+
 	nsamples=nsamples_;
 	if (nsamples%2!=0) {
 		nsamples+=1;

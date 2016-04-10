@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <iostream>
 #include <math.h>
 #include "Player.h"
 #include "globals.h"
@@ -26,6 +27,7 @@ static int player_count=0;
 
 Player::Player():Thread(){
 	player_count++;
+	printf("starting new player.\n");
 	if (player_count>1) {
 		printf("Error: Player class multiples instances.\n");
 		exit(1);
@@ -33,9 +35,8 @@ Player::Player():Thread(){
 
 	stretchl=NULL;
 	stretchr=NULL;
-	binaural_beats=NULL;
 
-	ai=NULL;    
+	ai=NULL;
 
 	newtask.mode=TASK_NONE;
 	newtask.startpos=0.0;
@@ -43,6 +44,7 @@ Player::Player():Thread(){
 	newtask.fftsize=4096;
 
 	task=newtask;
+	task.mode=TASK_NONE;
 	mode=MODE_STOP;
 
 	outbuf.n=0;
@@ -83,21 +85,25 @@ Player::~Player(){
 	if (inbuf.r) delete inbuf.r;
 	if (inbuf_i) delete inbuf_i;
 	if (ai) delete ai;
-	if (binaural_beats) delete binaural_beats;binaural_beats=NULL;
 };
 
 Player::ModeType Player::getmode(){
 	return mode;
 };
 
-void Player::startplay(std::string filename, REALTYPE startpos,REALTYPE rap, int fftsize,FILE_TYPE intype,bool bypass,ProcessParameters *ppar,BinauralBeatsParameters *bbpar){
+void Player::startplay(std::string filename, REALTYPE startpos, REALTYPE rap, int fftsize,FILE_TYPE intype, bool bypass, ProcessParameters *ppar){
 	info.playing=false;
 	info.eof=false;
 	bypass_mode=bypass;
-	if (bypass) freeze_mode=false;
+	
+	if (bypass) {
+		freeze_mode=false;
+	}
+
 	paused=false;
+	
 	taskmutex.lock();
-	newtask.mode=TASK_START;
+	
 	newtask.filename=filename;
 	newtask.startpos=startpos;
 	newtask.rap=rap;
@@ -105,8 +111,11 @@ void Player::startplay(std::string filename, REALTYPE startpos,REALTYPE rap, int
 	newtask.intype=intype;
 	newtask.bypass=bypass;
 	newtask.ppar=ppar;
-	newtask.bbpar=bbpar;
+	newtask.mode=TASK_START;
+
 	taskmutex.unlock();
+
+	std::cout << "Player::startplay end" << std::endl;
 };
 
 void Player::stop(){
@@ -121,6 +130,7 @@ void Player::pause(){
 };
 
 void Player::seek(REALTYPE pos){
+	//abort();
 	taskmutex.lock();
 	newtask.mode=TASK_SEEK;
 	newtask.startpos=pos;
@@ -138,17 +148,17 @@ void Player::setrap(REALTYPE newrap){
 	taskmutex.unlock();
 };
 
-void Player::set_process_parameters(ProcessParameters *ppar,BinauralBeatsParameters *bbpar){
+void Player::set_process_parameters(ProcessParameters *ppar){
+	std::cout << "set_process_parameters" << std::endl;
 	taskmutex.lock();
 	newtask.mode=TASK_PARAMETERS;
 	newtask.ppar=ppar;
-	newtask.bbpar=bbpar;
 	taskmutex.unlock();
 };
 
 
 void Player::set_window_type(FFTWindow window){
-	window_type=window;
+	window_type=W_HAMMING;//window;
 };
 
 void Player::set_volume(REALTYPE vol){
@@ -218,27 +228,30 @@ void Player::getaudiobuffer(int nsamples, float *out){
 
 
 void Player::run(){
+	printf("entering while(1)\n");
 	while(1){
 		newtaskcheck();
-
 		if (mode==MODE_STOP) sleep(10);
-		if ((mode==MODE_PLAY)||(mode==MODE_PREPARING)){
+		if ((mode==MODE_PLAY) || (mode==MODE_PREPARING)){
 			computesamples();
 		};
 
-
 		task.mode=TASK_NONE;
-
 	};
+	printf("out of while(1)");
 };
 
 void Player::newtaskcheck(){
+
 	TaskMode newmode=TASK_NONE;
+
 	taskmutex.lock();
-	if (task.mode!=newtask.mode) {
-		newmode=newtask.mode;
+	if (task.mode != newtask.mode) {
+		std::cout << "New task: [" << newtask.mode << "]" << std::endl;
+		newmode = newtask.mode;
 		task=newtask;
 	};
+	
 	newtask.mode=TASK_NONE;
 	taskmutex.unlock();
 
@@ -247,13 +260,9 @@ void Player::newtaskcheck(){
 			current_filename=task.filename;
 			task.startpos=0.0;
 		};
-		switch (task.intype){
-			case FILE_VORBIS:ai=new VorbisInputS;
-							 break;
-			case FILE_MP3:ai=new MP3InputS;
-						  break;
-			default: ai=new AInputS;
-		};
+		
+		ai=new AInputS;
+
 		if (ai->open(task.filename)){
 			info.samplerate=ai->info.samplerate;
 			mode=MODE_PREPARING;
@@ -265,12 +274,9 @@ void Player::newtaskcheck(){
 			if (stretchr) delete stretchr;stretchr=NULL;
 			stretchl=new ProcessedStretch(task.rap,task.fftsize,window_type,task.bypass,ai->info.samplerate,1);
 			stretchr=new ProcessedStretch(task.rap,task.fftsize,window_type,task.bypass,ai->info.samplerate,2);
-			if (binaural_beats) delete binaural_beats;binaural_beats=NULL;
-			binaural_beats=new BinauralBeats(ai->info.samplerate);
 
 			if (stretchl) stretchl->set_parameters(task.ppar);
 			if (stretchr) stretchr->set_parameters(task.ppar);
-			if (binaural_beats) binaural_beats->pars=*(task.bbpar);
 
 			inbufsize=stretchl->get_max_bufsize();
 			if (inbuf.l) delete []inbuf.l;inbuf.l=NULL;
@@ -333,17 +339,21 @@ void Player::newtaskcheck(){
 		};
 	};
 	if (newmode==TASK_SEEK){
-		if (ai) ai->seek(task.startpos);
+		std::cout << "newmode==TASK_SEEK" << std::endl;
+		if (ai) {
+			ai->seek(task.startpos);
+		}
 		first_in_buf=true;
 	};
 	if (newmode==TASK_RAP){
+	std::cout << "newmode==TASK_RAP" << std::endl;
 		if (stretchl) stretchl->set_rap(task.rap);
 		if (stretchl) stretchr->set_rap(task.rap);
 	};
 	if (newmode==TASK_PARAMETERS){
+		std::cout << "newmode==TASK_PARAM" << std::endl;
 		if (stretchl) stretchl->set_parameters(task.ppar);
 		if (stretchr) stretchr->set_parameters(task.ppar);
-		if (binaural_beats) binaural_beats->pars=*(task.bbpar);
 	};
 };
 
@@ -417,7 +427,6 @@ void Player::computesamples(){
 		stretchl->here_is_onset(onset);
 		stretchr->here_is_onset(onset);
 		
-		binaural_beats->process(stretchl->out_buf,stretchr->out_buf,stretchl->get_bufsize(),in_pos_100);
 		//	stretchl->process_output(stretchl->out_buf,stretchl->out_bufsize);
 		//	stretchr->process_output(stretchr->out_buf,stretchr->out_bufsize);
 		int nskip=stretchl->get_skip_nsamples();

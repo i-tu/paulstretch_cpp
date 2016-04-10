@@ -254,7 +254,6 @@ int XMLwrapper::loadXMLfile(const char *filename){
     char *xmldata=doloadfile(filename);    
     if (xmldata==NULL) return(-1);//the file could not be loaded or uncompressed
    
-   printf("%s\n",xmldata);	
     root=tree=mxmlLoadString(NULL,xmldata,MXML_OPAQUE_CALLBACK);
 
     delete []xmldata;

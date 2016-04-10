@@ -18,7 +18,7 @@
 #include "Mutex.h"
 Mutex::Mutex(){
 #ifdef WINDOWS
-    InitializeCriticalSection(&mutex);
+//    InitializeCriticalSection(&mutex);
 #else
     pthread_mutex_init(&mutex,NULL);
 #endif
@@ -26,7 +26,7 @@ Mutex::Mutex(){
 
 Mutex::~Mutex(){
 #ifdef WINDOWS
-    DeleteCriticalSection(&mutex);
+//    DeleteCriticalSection(&mutex);
 #else
     pthread_mutex_destroy(&mutex);
 #endif
@@ -35,7 +35,7 @@ Mutex::~Mutex(){
 
 void Mutex::lock(){
 #ifdef WINDOWS
-    EnterCriticalSection(&mutex);
+//    EnterCriticalSection(&mutex);
 #else
     pthread_mutex_lock(&mutex);
 #endif
@@ -43,7 +43,7 @@ void Mutex::lock(){
 
 void Mutex::unlock(){
 #ifdef WINDOWS
-    LeaveCriticalSection(&mutex);
+//    LeaveCriticalSection(&mutex);
 #else
     pthread_mutex_unlock(&mutex);
 #endif

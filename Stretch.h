@@ -19,11 +19,7 @@
 #define STRETCH_H
 #include "globals.h"
 
-#ifdef KISSFFT
-#include <kiss_fftr.h>
-#else
 #include <fftw3.h>
-#endif
 
 
 enum FFTWindow{W_RECTANGULAR,W_HAMMING,W_HANN,W_BLACKMAN,W_BLACKMAN_HARRIS};

@@ -19,6 +19,7 @@
 */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include "PAaudiooutput.h"
 
 Player *player=NULL;
@@ -29,16 +30,17 @@ static int PAprocess(const void *inputBuffer,void *outputBuffer,
 		const PaStreamCallbackTimeInfo *outTime,PaStreamCallbackFlags statusFlags,void *userData){
 	float *out=(float *)outputBuffer;
     player->getaudiobuffer(framesPerBuffer,out);
-
     return(0);
 };
 
 void PAaudiooutputinit(Player *player_,int samplerate){
+    printf("PAaudiooutputinit");
     player=player_;
     if (stream) return;
     Pa_Initialize();
     Pa_OpenDefaultStream(&stream,0,2,paFloat32,samplerate,PA_SOUND_BUFFER_SIZE,PAprocess,NULL);
     Pa_StartStream(stream);
+    printf(" ...\n");
 };
 
 void PAfinish(){

@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "AInputS.h"
+
 using namespace std;
 
 AInputS::AInputS(){
@@ -42,7 +43,6 @@ bool AInputS::open(string filename){
 		eof=true;
 		return false;
 	};
-    
   
     afSetVirtualChannels(handle,AF_DEFAULT_TRACK,2);
 
@@ -80,6 +80,7 @@ int AInputS::read(int nsmps,short int *smps){
 };
 
 void AInputS::seek(double pos){
+  printf("AInputS::seek");
     if (handle==AF_NULL_FILEHANDLE) return;
     AFframecount p=(AFframecount)(pos*info.nsamples);
 	if (p==info.currentsample) return;

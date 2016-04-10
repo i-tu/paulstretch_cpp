@@ -2,7 +2,7 @@
   Copyright (C) 2006-2011 Nasca Octavian Paul
   Author: Nasca Octavian Paul
 
-  This program is free software; you can redistribute it and/or modify
+  This program is free software; you can rediribute it and/or modify
   it under the terms of version 2 of the GNU General Public License 
   as published by the Free Software Foundation.
 
@@ -17,15 +17,15 @@
 */
 #include <math.h>
 #include <stdlib.h>
-#include <FL/Fl.H>
 #include "globals.h"
 #include "Control.h"
 #include "XMLwrapper.h"
 using namespace std;
 
-Control::Control(){
-	player=new Player();
-	player->start();
+Control::Control(bool initPlayer){
+	if (initPlayer) {
+		InitPlayer();
+	}
 
 	wavinfo.samplerate=44100;
 	wavinfo.nsamples=0;
@@ -33,7 +33,7 @@ Control::Control(){
 	wav32bit=false;
 
 	process.bufsize=16384;
-	process.stretch=4.0;
+	process.stretch=100.0;
 	process.onset_detection_sensitivity=0.0;
 
 	seek_pos=0.0;
@@ -52,20 +52,28 @@ Control::Control(){
 ///	process.transient.enable=true;
 };
 
+void Control::InitPlayer() {
+	player=new Player();
+	player->start();
+
+	set_window_type(window_type);
+	set_volume(volume);
+	update_process_parameters();
+}
+
 Control::~Control(){
 	//    delete player; face crash daca il las
 };
 	
 
-bool Control::set_input_filename(string filename,FILE_TYPE intype){
-	InputS *ai=NULL;
-	if (intype==FILE_VORBIS) ai=new VorbisInputS;
-	if (intype==FILE_MP3) ai=new MP3InputS;
-	if (intype==FILE_WAV) ai=new AInputS;
-	if (!ai) return false;
+bool Control::set_input_filename(string filename, FILE_TYPE intype){
+	InputS *ai = new AInputS;
+
 	wavinfo.filename=filename;
 	wavinfo.intype=intype;
-	bool result=ai->open(wavinfo.filename);
+	
+	bool result = ai->open(wavinfo.filename);
+	
 	if (result) {
 		wavinfo.samplerate=ai->info.samplerate;
 		wavinfo.nsamples=ai->info.nsamples;
@@ -210,19 +218,11 @@ string Control::get_fftresolution_info(){
 };
 
 
-void Control::startplay(bool bypass){
-	if ((!player->info.playing)||(player->info.samplerate!=wavinfo.samplerate)){
-		stopplay();
+void Control::startplay(bool bypass){	
+		//stopplay();
 		sleep(200);
-#ifdef HAVE_JACK
-		JACKaudiooutputinit(player,wavinfo.samplerate);
-#else
 		PAaudiooutputinit(player,wavinfo.samplerate);
-#endif
-	};
-	if (wavinfo.filename!="") player->startplay(wavinfo.filename,seek_pos,process.stretch,process.bufsize,wavinfo.intype,bypass,&ppar,&bbpar);
-//	sleep(100);
-//	update_process_parameters();
+		player->startplay(wavinfo.filename,seek_pos,process.stretch,process.bufsize,wavinfo.intype,bypass,&ppar);
 };
 void Control::stopplay(){
 	player->stop();
@@ -244,7 +244,7 @@ void Control::freezeplay(){
 
 void Control::set_volume(REALTYPE vol){
 	volume=vol;
-	player->set_volume(vol);
+	if (player) player->set_volume(vol);
 };
 
 
@@ -349,10 +349,8 @@ int Control::optimizebufsize(int n){
 	else return n2;
 };
 
-
-
 void Control::set_window_type(FFTWindow window){
-	window_type=window;
+  window_type=window;
 	if (player) player->set_window_type(window);
 };
 
@@ -365,22 +363,14 @@ string Control::Render(string inaudio,string outaudio,FILE_TYPE outtype,FILE_TYP
 	};
 	InputS *ai=NULL;
 	switch(intype){
-		case FILE_VORBIS:ai=new VorbisInputS;
-						 break;
-		case FILE_MP3:ai=new MP3InputS;
-					  break;
 		default:ai=new AInputS;
 	};
 	AOutputS ao;
-	VorbisOutputS vorbisout;
 	info.cancel_render=false;
 	if (!ai->open(inaudio)){
 		return "Error: Could not open audio file (or file format not recognized) :"+inaudio;
 	};
-	BinauralBeats bb(ai->info.samplerate);
-	bb.pars=bbpar;
 	if (outtype==FILE_WAV) ao.newfile(outaudio,ai->info.samplerate,wav32bit);
-	if (outtype==FILE_VORBIS) vorbisout.newfile(outaudio,ai->info.samplerate);
 
 	ai->seek(pos1);
 
@@ -392,8 +382,8 @@ string Control::Render(string inaudio,string outaudio,FILE_TYPE outtype,FILE_TYP
 	struct{
 		REALTYPE *l,*r;
 	}inbuf;
-	ProcessedStretch *stretchl=new ProcessedStretch(process.stretch,inbufsize,window_type,false,ai->info.samplerate,1);
-	ProcessedStretch *stretchr=new ProcessedStretch(process.stretch,inbufsize,window_type,false,ai->info.samplerate,2);
+	ProcessedStretch *stretchl = new ProcessedStretch(process.stretch,inbufsize,window_type,false,ai->info.samplerate,1);
+	ProcessedStretch *stretchr = new ProcessedStretch(process.stretch,inbufsize,window_type,false,ai->info.samplerate,2);
 	stretchl->set_onset_detection_sensitivity(process.onset_detection_sensitivity);
 	stretchr->set_onset_detection_sensitivity(process.onset_detection_sensitivity);
 	stretchl->set_parameters(&ppar);
@@ -432,7 +422,6 @@ string Control::Render(string inaudio,string outaudio,FILE_TYPE outtype,FILE_TYP
 		REALTYPE onset=(onset_l>onset_r)?onset_l:onset_r;
 		stretchl->here_is_onset(onset);
 		stretchr->here_is_onset(onset);
-		bb.process(stretchl->out_buf,stretchr->out_buf,outbufsize,in_pos*100.0);
 		for (int i=0;i<outbufsize;i++) {
 			stretchl->out_buf[i]*=volume;
 			stretchr->out_buf[i]*=volume;
@@ -452,7 +441,6 @@ string Control::Render(string inaudio,string outaudio,FILE_TYPE outtype,FILE_TYP
 			};
 			ao.write(outbufsize,outbuf);
 		};
-		if (outtype==FILE_VORBIS) vorbisout.write(outbufsize,stretchl->out_buf,stretchr->out_buf);
 
 		REALTYPE totalf=ai->info.currentsample/(REALTYPE)ai->info.nsamples-pos1;
 		if (totalf>(pos2-pos1)) break;
@@ -462,7 +450,9 @@ string Control::Render(string inaudio,string outaudio,FILE_TYPE outtype,FILE_TYP
 		if (pause_write>pause_max_write){
 			float tmp=outbufsize/1000000.0;
 			if (tmp>0.1) tmp=0.1;
-			Fl::wait(0.01+tmp);
+			
+			//Fl::wait(0.01+tmp);
+
 			pause_write=0;
 			if (info.cancel_render) break;
 		};
@@ -492,7 +482,7 @@ string Control::getfftsizestr(int fftsize){
 };
 
 void Control::update_process_parameters(){
-	if (player) player->set_process_parameters(&ppar,&bbpar);
+	if (player) player->set_process_parameters(&ppar);
 };
 
 bool Control::save_parameters(const char *filename){
@@ -515,11 +505,7 @@ bool Control::save_parameters(const char *filename){
 			xml->endbranch();
 			
 			xml->beginbranch("PROCESS");
-				ppar.add2XML(xml);
-			xml->endbranch();
-
-			xml->beginbranch("BINAURAL_BEATS");
-				bbpar.add2XML(xml);
+    			ppar.add2XML(xml);
 			xml->endbranch();
 
 		xml->endbranch();
@@ -551,7 +537,9 @@ bool Control::load_parameters(const char *filename){
 			gui_sliders.fftsize_s=xml->getparreal("fftsize_s",gui_sliders.fftsize_s);
 			gui_sliders.stretch_s=xml->getparreal("stretch_s",gui_sliders.stretch_s);
 			gui_sliders.mode_s=xml->getpar("mode_s",gui_sliders.mode_s,0,2);
-			window_type=(FFTWindow)xml->getpar("window_type",window_type,0,4);
+
+			window_type=W_HANN;//(FFTWindow)xml->getpar("window_type",window_type,0,4);
+			
 			process.onset_detection_sensitivity=xml->getparreal("onset_detection_sensitivity",0.0);
 			volume=xml->getparreal("volume",1.0);
 			xml->exitbranch();
@@ -562,20 +550,17 @@ bool Control::load_parameters(const char *filename){
 			xml->exitbranch();
 		};
 
-		if (xml->enterbranch("BINAURAL_BEATS")){
-				bbpar.getfromXML(xml);
-			xml->exitbranch();
-		};
-
 		xml->exitbranch();
 	};
 	delete xml;
 
+//		set_window_type(window_type);
+//		set_volume(volume);
+//		update_process_parameters();
+
 	set_stretch_controls(gui_sliders.stretch_s,gui_sliders.mode_s,gui_sliders.fftsize_s,process.onset_detection_sensitivity);
 	
-	set_window_type(window_type);
-	set_volume(volume);
-	update_process_parameters();
+
 	return true;
 };
 	

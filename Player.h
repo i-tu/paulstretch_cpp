@@ -20,11 +20,8 @@
 
 #include <string>
 #include "Input/AInputS.h"
-#include "Input/VorbisInputS.h"
-#include "Input/MP3InputS.h"
 #include "ProcessedStretch.h"
 #include "Thread.h"
-#include "BinauralBeats.h"
 #include "Mutex.h"
 #include "globals.h"
 
@@ -36,7 +33,7 @@ class Player:public Thread{
 	Player();
 	~Player();
 	
-	void startplay(std::string filename, REALTYPE startpos,REALTYPE rap, int fftsize,FILE_TYPE intype,bool bypass,ProcessParameters *ppar,BinauralBeatsParameters *bbpar);
+	void startplay(std::string filename, REALTYPE startpos,REALTYPE rap, int fftsize,FILE_TYPE intype,bool bypass,ProcessParameters *ppar);
 	    //startpos is from 0 (start) to 1.0 (end of file)
 	void stop();
 	void pause();
@@ -69,9 +66,8 @@ class Player:public Thread{
 	void set_volume(REALTYPE vol);
 	void set_onset_detection_sensitivity(REALTYPE onset);
 	
-	void set_process_parameters(ProcessParameters *ppar,BinauralBeatsParameters *bbpar);
-	
-	BinauralBeats *binaural_beats;
+	void set_process_parameters(ProcessParameters *ppar);
+	FFTWindow window_type;
 
     private:
 	void run();
@@ -99,7 +95,6 @@ class Player:public Thread{
 	    FILE_TYPE intype;
 	    bool bypass;
 	    ProcessParameters *ppar;
-	    BinauralBeatsParameters *bbpar;
 	}newtask,task;
 	
 	struct{
@@ -124,7 +119,6 @@ class Player:public Thread{
 	REALTYPE volume,onset_detection_sensitivity;
 
 	std::string current_filename;
-	FFTWindow window_type;
 };
 
 #endif

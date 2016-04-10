@@ -21,19 +21,14 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 
 #include "globals.h"
 #include "Input/AInputS.h"
-#include "Input/VorbisInputS.h"
-#include "Input/MP3InputS.h"
 #include "Output/AOutputS.h"
-#include "Output/VorbisOutputS.h"
 #include "ProcessedStretch.h"
 #include "Player.h"
-#include "JAaudiooutput.h"
 #include "PAaudiooutput.h"
-#include "BinauralBeats.h"
 
 class Control{
 	public:
-		Control();
+		Control(bool initPlayer);
 		~Control();
 
 		void UpdateControlInfo();
@@ -41,6 +36,7 @@ class Control{
 		void stopplay();
 		void pauseplay();
 		void freezeplay();
+		void InitPlayer();
 
 		void set_volume(REALTYPE vol);
 
@@ -90,13 +86,13 @@ class Control{
 		}info;
 
 		ProcessParameters ppar;
-		BinauralBeatsParameters	bbpar;
 		bool wav32bit;
 		void update_process_parameters();//pt. player
 		struct{
 			double fftsize_s,stretch_s;
 			int mode_s;
 		}gui_sliders;	   
+
 		FFTWindow window_type;
 
 	private:
@@ -118,6 +114,7 @@ class Control{
 			std::string filename;
 			FILE_TYPE intype;
 		}wavinfo;//input
+
 		REALTYPE seek_pos;
 
 		Player *player;
